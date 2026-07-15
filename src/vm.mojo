@@ -1,6 +1,7 @@
 from std.collections import List
-from std.python import Python, PythonObject
 from std.sys import argv
+
+from terminal import Terminal
 
 
 struct Registers:
@@ -86,13 +87,12 @@ def mem_write(mut memory: List[UInt16], address: UInt16, val: UInt16):
 
 
 def mem_read(
-    mut memory: List[UInt16], terminal: PythonObject, address: UInt16
+    mut memory: List[UInt16], terminal: Terminal, address: UInt16
 ) raises -> UInt16:
     if address == KeyboardStatus.MR_KBSR:
-        if Bool(terminal.check_key()):
-            var ch = String(py=terminal.getch())
+        if terminal.check_key():
             memory[Int(KeyboardStatus.MR_KBSR)] = UInt16(1 << 15)
-            memory[Int(KeyboardStatus.MR_KBDR)] = UInt16(ord(ch[byte=0]))
+            memory[Int(KeyboardStatus.MR_KBDR)] = terminal.getch()
         else:
             memory[Int(KeyboardStatus.MR_KBSR)] = UInt16(0)
 
@@ -127,7 +127,7 @@ def ins[
 ](
     mut memory: List[UInt16],
     mut reg: List[UInt16],
-    terminal: PythonObject,
+    terminal: Terminal,
     instr: UInt16,
 ) raises -> Bool:
     var r0 = UInt16(0)
@@ -223,8 +223,7 @@ def ins[
 
         var trap = instr & UInt16(0xFF)
         if trap == TrapCode.GETC:
-            var ch = String(py=terminal.getch())
-            reg[Registers.R_R0] = UInt16(ord(ch[byte=0]))
+            reg[Registers.R_R0] = terminal.getch()
             update_flags(reg, Registers.R_R0)
         elif trap == TrapCode.OUT:
             terminal.put_code(Int(reg[Registers.R_R0]))
@@ -235,9 +234,9 @@ def ins[
                 address += 1
         elif trap == TrapCode.IN:
             terminal.write("Enter a character: ")
-            var ch = String(py=terminal.getch())
-            terminal.put_code(ord(ch[byte=0]))
-            reg[Registers.R_R0] = UInt16(ord(ch[byte=0]))
+            var ch = terminal.getch()
+            terminal.put_code(Int(ch))
+            reg[Registers.R_R0] = ch
             update_flags(reg, Registers.R_R0)
         elif trap == TrapCode.PUTSP:
             var address = Int(reg[Registers.R_R0])
@@ -263,7 +262,7 @@ def ins[
 def execute_instruction(
     mut memory: List[UInt16],
     mut reg: List[UInt16],
-    terminal: PythonObject,
+    terminal: Terminal,
     instr: UInt16,
 ) raises -> Bool:
     var op = Int(instr >> 12)
@@ -301,8 +300,7 @@ def execute_instruction(
 
 
 def main() raises:
-    Python.add_to_path("src")
-    var terminal = Python.import_module("terminal")
+    var terminal = Terminal()
     var memory = List[UInt16](length=MEMORY_MAX, fill=UInt16(0))
     var reg = List[UInt16](length=Registers.COUNT, fill=UInt16(0))
     var args = argv()
